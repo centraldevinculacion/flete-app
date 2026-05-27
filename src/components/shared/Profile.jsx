@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../../context/AppContext'
 import { db, fmt } from '../../utils/storage'
-import { storageUsageMB } from '../../utils/imageUtils'
 import { Stars } from './StarRating'
 
 export default function Profile() {
@@ -9,12 +8,10 @@ export default function Profile() {
   const [ratings, setRatings] = useState([])
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({ name: currentUser.name, vehicle: currentUser.vehicle || '', phone: currentUser.phone || '' })
-  const [storageUsed, setStorageUsed] = useState('?')
   const [showClearConfirm, setShowClearConfirm] = useState(false)
 
   useEffect(() => {
     setRatings(db.ratings.forUser(currentUser.id))
-    setStorageUsed(storageUsageMB())
   }, [dataVersion, currentUser.id])
 
   const handleSave = () => {
@@ -42,23 +39,21 @@ export default function Profile() {
     addToast('Datos exportados', 'success')
   }
 
-  const handleClearData = () => {
-    // Only clear this user's data
-    const freights = db.freights.getAll().filter(f => f.clientId !== currentUser.id && f.driverId !== currentUser.id)
-    db.freights.save(freights)
-    const msgs = db.messages.getAll().filter(m => {
-      const relatedFreightIds = freights.map(f => f.id)
-      return relatedFreightIds.includes(m.freightId)
-    })
-    db.messages.save(msgs)
+  const handleClearData = async () => {
+    const userFreights = db.freights.getAll().filter(
+      f => f.clientId === currentUser.id || f.driverId === currentUser.id
+    )
+    const userFreightIds = userFreights.map(f => f.id)
+    const userMessages = db.messages.getAll().filter(m => userFreightIds.includes(m.freightId))
+    await Promise.all([
+      ...userFreights.map(f => db.freights.delete(f.id)),
+      ...userMessages.map(m => db.messages.delete(m.id)),
+    ])
     setShowClearConfirm(false)
-    setStorageUsed(storageUsageMB())
     addToast('Historial eliminado', 'warning')
   }
 
   const initials = currentUser.name.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase()
-  const storageNum = parseFloat(storageUsed)
-  const storageColor = storageNum > 3 ? 'text-red-600' : storageNum > 1.5 ? 'text-orange-500' : 'text-green-600'
 
   return (
     <div className="p-4 space-y-4">
@@ -135,18 +130,13 @@ export default function Profile() {
         ))}
       </div>
 
-      {/* Storage & Tools */}
+      {/* Data & Tools */}
       <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
-        <h3 className="font-semibold text-gray-900">Datos y almacenamiento</h3>
+        <h3 className="font-semibold text-gray-900">Datos</h3>
         <div className="flex justify-between items-center py-1 border-b border-gray-50">
-          <span className="text-sm text-gray-500">💾 Almacenamiento usado</span>
-          <span className={`text-sm font-bold ${storageColor}`}>{storageUsed} MB</span>
+          <span className="text-sm text-gray-500">☁️ Almacenamiento</span>
+          <span className="text-sm font-medium text-blue-600">Firebase Cloud</span>
         </div>
-        {storageNum > 3 && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 text-xs text-red-700">
-            ⚠️ El almacenamiento está casi lleno. Las fotos ocupan mucho espacio. Considerá limpiar el historial.
-          </div>
-        )}
         <div className="grid grid-cols-2 gap-2">
           <button onClick={handleExport}
             className="flex items-center justify-center gap-1.5 py-2.5 border border-blue-200 text-blue-600 rounded-xl text-sm font-medium hover:bg-blue-50">

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../../context/AppContext'
 import { db, fmt, STATUS_LABELS, STATUS_STEPS } from '../../utils/storage'
 import { Stars, RatingInput } from '../shared/StarRating'
-import { compressImage } from '../../utils/imageUtils'
+import { compressImage, uploadPhoto } from '../../utils/imageUtils'
 
 const CONDITIONS = ['Sin problemas', 'Rayado', 'Rajado', 'Roto']
 const STEP_LABELS = ['Pendiente', 'Asignado', 'Recogiendo', 'Tránsito', 'Entregado']
@@ -45,11 +45,12 @@ export default function DriverActiveFreight() {
     setUploading(true)
     try {
       const compressed = await compressImage(file)
-      const newPhotos = [...(freight.photos || []), compressed]
+      const url = await uploadPhoto(compressed, freight.id)
+      const newPhotos = [...(freight.photos || []), url]
       updateFreight(freight.id, { photos: newPhotos })
       addToast('Foto agregada', 'success')
     } catch {
-      addToast('Error al procesar la foto', 'error')
+      addToast('Error al subir la foto', 'error')
     }
     setUploading(false)
     e.target.value = ''

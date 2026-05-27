@@ -1,3 +1,7 @@
+import { ref, uploadString, getDownloadURL } from 'firebase/storage'
+import { firebaseStorage } from '../firebase'
+import { uid } from './storage'
+
 export const compressImage = (file, maxDim = 1024, quality = 0.72) =>
   new Promise((resolve, reject) => {
     const img = new Image()
@@ -15,13 +19,9 @@ export const compressImage = (file, maxDim = 1024, quality = 0.72) =>
     img.src = url
   })
 
-export const storageUsageMB = () => {
-  try {
-    let bytes = 0
-    for (const k in localStorage) {
-      if (Object.prototype.hasOwnProperty.call(localStorage, k))
-        bytes += (localStorage[k].length + k.length) * 2
-    }
-    return (bytes / 1024 / 1024).toFixed(1)
-  } catch { return '?' }
+// Compress and upload a photo to Firebase Storage, returns the download URL
+export const uploadPhoto = async (dataUrl, freightId) => {
+  const photoRef = ref(firebaseStorage, `freights/${freightId}/${uid()}.jpg`)
+  const snapshot = await uploadString(photoRef, dataUrl, 'data_url')
+  return getDownloadURL(snapshot.ref)
 }

@@ -36,8 +36,8 @@ export default function RequestFreight() {
     }
   }
 
-  const handleConfirm = () => {
-    const freight = createFreight({
+  const handleConfirm = async () => {
+    const freight = await createFreight({
       origin: form.origin.trim(),
       destination: form.destination.trim(),
       km,
