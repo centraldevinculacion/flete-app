@@ -3,6 +3,7 @@ import Login from './components/auth/Login'
 import Register from './components/auth/Register'
 import Header from './components/shared/Header'
 import BottomNav from './components/shared/BottomNav'
+import ToastContainer from './components/shared/Toast'
 import ClientHome from './components/client/ClientHome'
 import RequestFreight from './components/client/RequestFreight'
 import ClientActiveFreight from './components/client/ClientActiveFreight'
@@ -14,7 +15,7 @@ import Profile from './components/shared/Profile'
 import Chat from './components/shared/Chat'
 
 function AppContent() {
-  const { currentUser, screen } = useApp()
+  const { currentUser, screen, toasts, removeToast } = useApp()
 
   if (!currentUser) {
     if (screen === 'register') return <Register />
@@ -48,6 +49,7 @@ function AppContent() {
   return (
     <div className="flex flex-col h-screen bg-gray-50 max-w-[430px] mx-auto shadow-2xl relative overflow-hidden">
       <Header />
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
       <main className="flex-1 overflow-y-auto pb-20 scrollbar-hide">
         {renderScreen()}
       </main>
@@ -58,7 +60,7 @@ function AppContent() {
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-gray-200">
+    <div className="min-h-screen bg-gray-300">
       <AppContent />
     </div>
   )
