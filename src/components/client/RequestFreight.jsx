@@ -1,34 +1,144 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../../context/AppContext'
 import { db, fmt, calcPrice } from '../../utils/storage'
 import { Stars } from '../shared/StarRating'
 
+const haversine = (lat1, lng1, lat2, lng2) => {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
+}
+
+function AddressInput({ label, value, onChange, placeholder }) {
+  const [query, setQuery] = useState(value?.label || '')
+  const [suggestions, setSuggestions] = useState([])
+  const [loading, setLoading] = useState(false)
+  const debounceRef = useRef(null)
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    if (value?.label && query !== value.label) setQuery(value.label)
+  }, [value?.label])
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setSuggestions([])
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const handleChange = (e) => {
+    const q = e.target.value
+    setQuery(q)
+    onChange(null)
+    clearTimeout(debounceRef.current)
+    if (q.length < 3) { setSuggestions([]); return }
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true)
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5&countrycodes=ar`,
+          { headers: { 'Accept-Language': 'es' } }
+        )
+        const data = await res.json()
+        setSuggestions(data.map(r => ({
+          label: r.display_name,
+          lat: parseFloat(r.lat),
+          lng: parseFloat(r.lon),
+        })))
+      } catch {
+        setSuggestions([])
+      } finally {
+        setLoading(false)
+      }
+    }, 500)
+  }
+
+  const handleSelect = (s) => {
+    setQuery(s.label)
+    onChange(s)
+    setSuggestions([])
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</label>
+      <div className="relative mt-1">
+        <input
+          value={query}
+          onChange={handleChange}
+          placeholder={placeholder}
+          className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8"
+        />
+        {loading && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+        {value && !loading && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 text-sm">✓</div>
+        )}
+      </div>
+      {suggestions.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+          {suggestions.map((s, i) => (
+            <button
+              key={i}
+              type="button"
+              onMouseDown={() => handleSelect(s)}
+              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 border-b border-gray-50 last:border-0 leading-snug"
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function RequestFreight() {
   const { currentUser, setScreen, createFreight, setActiveFreightId } = useApp()
   const [form, setForm] = useState({
-    origin: '', destination: '', km: '',
+    origin: null,
+    destination: null,
+    km: '',
     extras: { peon: false, stairs: false },
     paymentTiming: 'after',
     selectedDriverId: null,
   })
   const [onlineDrivers, setOnlineDrivers] = useState([])
-  const [step, setStep] = useState(1) // 1: details, 2: driver selection, 3: confirm
+  const [step, setStep] = useState(1)
   const [error, setError] = useState('')
 
   useEffect(() => {
     setOnlineDrivers(db.users.getAll().filter(u => u.role === 'driver' && u.online))
   }, [])
 
+  useEffect(() => {
+    if (form.origin && form.destination) {
+      const km = haversine(form.origin.lat, form.origin.lng, form.destination.lat, form.destination.lng)
+      setForm(f => ({ ...f, km: km > 0 ? String(km) : f.km }))
+    }
+  }, [form.origin, form.destination])
+
   const km = parseFloat(form.km) || 0
   const price = km > 0 ? calcPrice(km, form.extras) : 0
 
-  const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }))
   const setExtra = (key) => (e) => setForm(f => ({ ...f, extras: { ...f.extras, [key]: e.target.checked } }))
 
   const handleNext = () => {
     if (step === 1) {
-      if (!form.origin.trim() || !form.destination.trim()) { setError('Completá origen y destino'); return }
-      if (!form.km || km <= 0) { setError('Ingresá una distancia válida'); return }
+      if (!form.origin) { setError('Seleccioná un punto de partida de las sugerencias'); return }
+      if (!form.destination) { setError('Seleccioná un destino de las sugerencias'); return }
+      if (!form.km || km <= 0) { setError('La distancia debe ser mayor a 0'); return }
       setError('')
       setStep(2)
     } else if (step === 2) {
@@ -38,8 +148,8 @@ export default function RequestFreight() {
 
   const handleConfirm = async () => {
     const freight = await createFreight({
-      origin: form.origin.trim(),
-      destination: form.destination.trim(),
+      origin: form.origin.label,
+      destination: form.destination.label,
       km,
       price,
       extras: form.extras,
@@ -76,37 +186,35 @@ export default function RequestFreight() {
       {/* Step 1: Route details */}
       {step === 1 && (
         <div className="space-y-4">
-          <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+          <div className="bg-white rounded-xl shadow-sm p-4 space-y-4">
             <h2 className="font-semibold text-gray-900">Recorrido</h2>
-            <div>
-              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">📍 Punto de partida</label>
-              <input
-                value={form.origin}
-                onChange={set('origin')}
-                placeholder="ej: Av. Corrientes 1234, CABA"
-                className="mt-1 w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">🏁 Punto de destino</label>
-              <input
-                value={form.destination}
-                onChange={set('destination')}
-                placeholder="ej: Florida 555, Vicente López"
-                className="mt-1 w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            <AddressInput
+              label="📍 Punto de partida"
+              value={form.origin}
+              onChange={(v) => setForm(f => ({ ...f, origin: v }))}
+              placeholder="ej: Av. Corrientes 1234, CABA"
+            />
+            <AddressInput
+              label="🏁 Punto de destino"
+              value={form.destination}
+              onChange={(v) => setForm(f => ({ ...f, destination: v }))}
+              placeholder="ej: Florida 555, Vicente López"
+            />
             <div>
               <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">📏 Distancia (km)</label>
               <input
                 type="number"
                 min="1"
                 value={form.km}
-                onChange={set('km')}
-                placeholder="ej: 25"
+                onChange={e => setForm(f => ({ ...f, km: e.target.value }))}
+                placeholder="Se calcula automáticamente"
                 className="mt-1 w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <p className="text-xs text-gray-400 mt-1">Ingresá la distancia aproximada del recorrido</p>
+              <p className="text-xs text-gray-400 mt-1">
+                {form.origin && form.destination
+                  ? 'Distancia en línea recta calculada automáticamente. Podés ajustarla si querés.'
+                  : 'Se calcula automáticamente al seleccionar origen y destino.'}
+              </p>
             </div>
           </div>
 
@@ -267,8 +375,8 @@ export default function RequestFreight() {
           <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
             <h2 className="font-semibold text-gray-900">Resumen de tu solicitud</h2>
             <div className="space-y-2 text-sm">
-              <SummaryRow label="📍 Origen" value={form.origin} />
-              <SummaryRow label="🏁 Destino" value={form.destination} />
+              <SummaryRow label="📍 Origen" value={form.origin?.label} />
+              <SummaryRow label="🏁 Destino" value={form.destination?.label} />
               <SummaryRow label="📏 Distancia" value={`${km} km`} />
               {form.extras.peon && <SummaryRow label="👷 Peón" value="+$15.000" />}
               {form.extras.stairs && <SummaryRow label="🏗️ Pasillos" value="+$5.000" />}
