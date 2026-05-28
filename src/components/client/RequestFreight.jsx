@@ -8,7 +8,7 @@ export default function RequestFreight() {
   const [form, setForm] = useState({
     origin: '', destination: '', km: '',
     extras: { peon: false, stairs: false },
-    paymentTiming: 'before',
+    paymentTiming: 'mercadopago',
     selectedDriverId: null,
   })
   const [onlineDrivers, setOnlineDrivers] = useState([])
@@ -162,12 +162,12 @@ export default function RequestFreight() {
             </div>
           )}
 
-          {/* Payment timing */}
+          {/* Payment method */}
           <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
-            <h2 className="font-semibold text-gray-900">Momento de pago</h2>
+            <h2 className="font-semibold text-gray-900">Forma de pago</h2>
             {[
-              { val: 'before', label: 'Antes de cargar', emoji: '💳', desc: 'Pagás cuando el transportista llega' },
-              { val: 'after', label: 'Después de descargar', emoji: '✅', desc: 'Pagás cuando recibís tu mercadería' },
+              { val: 'mercadopago', label: 'Mercado Pago', emoji: '💳', desc: 'Transferencia por Mercado Pago' },
+              { val: 'efectivo', label: 'Efectivo', emoji: '💵', desc: 'Pago en efectivo al transportista' },
             ].map(({ val, label, emoji, desc }) => (
               <label key={val} className="flex items-center gap-3 cursor-pointer">
                 <input
@@ -272,7 +272,7 @@ export default function RequestFreight() {
               <SummaryRow label="📏 Distancia" value={`${km} km`} />
               {form.extras.peon && <SummaryRow label="👷 Peón" value="+$15.000" />}
               {form.extras.stairs && <SummaryRow label="🏗️ Pasillos" value="+$5.000" />}
-              <SummaryRow label="💳 Pago" value={form.paymentTiming === 'before' ? 'Antes de cargar' : 'Después de descargar'} />
+              <SummaryRow label="💳 Pago" value={form.paymentTiming === 'mercadopago' ? 'Mercado Pago' : 'Efectivo'} />
             </div>
             <div className="border-t pt-3 flex justify-between items-center">
               <span className="font-semibold text-gray-900">Total estimado</span>
