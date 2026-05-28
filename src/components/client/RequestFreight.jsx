@@ -103,10 +103,10 @@ export default function RequestFreight() {
                 min="1"
                 value={form.km}
                 onChange={set('km')}
-                placeholder="ej: 25"
+                placeholder="ej: 12"
                 className="mt-1 w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <p className="text-xs text-gray-400 mt-1">Ingresá la distancia aproximada del recorrido</p>
+              <p className="text-xs text-gray-400 mt-1">Podés calcularlo en Google Maps antes de continuar</p>
             </div>
           </div>
 
