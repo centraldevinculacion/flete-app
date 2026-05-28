@@ -8,7 +8,7 @@ export default function RequestFreight() {
   const [form, setForm] = useState({
     origin: '', destination: '', km: '',
     extras: { peon: false, stairs: false },
-    paymentTiming: 'after',
+    paymentTiming: 'before',
     selectedDriverId: null,
   })
   const [onlineDrivers, setOnlineDrivers] = useState([])
