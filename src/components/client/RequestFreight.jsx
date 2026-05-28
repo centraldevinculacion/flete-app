@@ -44,7 +44,7 @@ function AddressInput({ label, value, onChange, placeholder }) {
       setLoading(true)
       try {
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5&countrycodes=ar&viewbox=-58.95,-34.28,-58.18,-35.00&bounded=1`,
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q + ', Buenos Aires')}&format=json&addressdetails=1&limit=5&countrycodes=ar&viewbox=-59.50,-34.00,-57.80,-35.40&bounded=1`,
           { headers: { 'Accept-Language': 'es' } }
         )
         const data = await res.json()
